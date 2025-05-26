@@ -1,0 +1,37 @@
+---
+import '@/styles/globals.css';
+import { ThemeProvider } from '@/components/theme-provider';
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'A modern SaaS starter template' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <script is:inline>
+      // Apply theme immediately to prevent flash
+      const theme = localStorage.getItem('vite-ui-theme') || 'system';
+      if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
+  </head>
+  <body>
+    <ThemeProvider client:load>
+      <div class="min-h-screen bg-background font-sans antialiased">
+        <slot />
+      </div>
+    </ThemeProvider>
+  </body>
+</html>
