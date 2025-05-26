@@ -1,0 +1,120 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import NavigationWrapper from '@/components/navigation-wrapper.astro';
+import { Footer } from '@/components/footer';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { getUser } from '@/lib/supabase/server';
+import { getProfile, getSubscription } from '@/lib/supabase/utils';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+
+const user = await getUser(Astro.cookies);
+const supabase = createServerSupabaseClient(Astro.cookies);
+
+let profile = null;
+let subscription = null;
+
+if (user) {
+  profile = await getProfile(supabase, user.id);
+  subscription = await getSubscription(supabase, user.id);
+}
+---
+
+<BaseLayout title="Dashboard">
+  <NavigationWrapper />
+  <div class="container py-8">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold">Dashboard</h1>
+      <p class="text-muted-foreground">Welcome back, {profile?.full_name || 'User'}!</p>
+    </div>
+
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile</CardTitle>
+          <CardDescription>Your account information</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl class="space-y-2">
+            <div>
+              <dt class="text-sm font-medium text-muted-foreground">Email</dt>
+              <dd class="text-sm">{user?.email}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-muted-foreground">Name</dt>
+              <dd class="text-sm">{profile?.full_name || 'Not set'}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-muted-foreground">Member since</dt>
+              <dd class="text-sm">
+                {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
+              </dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription</CardTitle>
+          <CardDescription>Your current plan</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl class="space-y-2">
+            <div>
+              <dt class="text-sm font-medium text-muted-foreground">Plan</dt>
+              <dd class="text-sm capitalize">{subscription?.plan || 'Free'}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-muted-foreground">Status</dt>
+              <dd class="text-sm capitalize">
+                <span class:list={[
+                  'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
+                  subscription?.status === 'active' && 'bg-green-100 text-green-700',
+                  subscription?.status !== 'active' && 'bg-gray-100 text-gray-700'
+                ]}>
+                  {subscription?.status || 'Inactive'}
+                </span>
+              </dd>
+            </div>
+            {subscription?.current_period_end && (
+              <div>
+                <dt class="text-sm font-medium text-muted-foreground">Renews on</dt>
+                <dd class="text-sm">
+                  {new Date(subscription.current_period_end).toLocaleDateString()}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-2">
+            <a href="/profile" class="block w-full">
+              <Button variant="outline" class="w-full justify-start">
+                Edit Profile
+              </Button>
+            </a>
+            <a href="/billing" class="block w-full">
+              <Button variant="outline" class="w-full justify-start">
+                Manage Billing
+              </Button>
+            </a>
+            <a href="/settings" class="block w-full">
+              <Button variant="outline" class="w-full justify-start">
+                Account Settings
+              </Button>
+            </a>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+  <Footer />
+</BaseLayout>

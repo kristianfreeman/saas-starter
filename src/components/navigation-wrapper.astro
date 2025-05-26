@@ -1,0 +1,16 @@
+---
+import { getSession } from '@/lib/supabase/server';
+import { AuthNavigation } from '@/components/auth-navigation';
+
+const session = await getSession(Astro.cookies);
+const isAuthenticated = !!session;
+const userEmail = session?.user?.email;
+const currentPath = Astro.url.pathname;
+---
+
+<AuthNavigation
+  client:load
+  currentPath={currentPath}
+  isAuthenticated={isAuthenticated}
+  userEmail={userEmail}
+/>

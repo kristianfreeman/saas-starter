@@ -1,0 +1,205 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import NavigationWrapper from '@/components/navigation-wrapper.astro';
+import { Footer } from '@/components/footer';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { getUser } from '@/lib/supabase/server';
+import { getProfile } from '@/lib/supabase/utils';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+
+const user = await getUser(Astro.cookies);
+const supabase = createServerSupabaseClient(Astro.cookies);
+
+let profile = null;
+if (user) {
+  profile = await getProfile(supabase, user.id);
+}
+---
+
+<BaseLayout title="Profile">
+  <NavigationWrapper />
+  <div class="container max-w-2xl py-8">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold">Profile</h1>
+      <p class="text-muted-foreground">Manage your account information</p>
+    </div>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Personal Information</CardTitle>
+        <CardDescription>Update your profile details</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form id="profile-form" class="space-y-4">
+          <div class="space-y-2">
+            <Label for="email">Email</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              value={user?.email || ''}
+              disabled
+              class="bg-muted"
+            />
+            <p class="text-xs text-muted-foreground">
+              Email cannot be changed
+            </p>
+          </div>
+          <div class="space-y-2">
+            <Label for="fullName">Full Name</Label>
+            <Input
+              id="fullName"
+              name="fullName"
+              type="text"
+              value={profile?.full_name || ''}
+              placeholder="Enter your full name"
+            />
+          </div>
+          <div class="space-y-2">
+            <Label for="avatarUrl">Avatar URL</Label>
+            <Input
+              id="avatarUrl"
+              name="avatarUrl"
+              type="url"
+              value={profile?.avatar_url || ''}
+              placeholder="https://example.com/avatar.jpg"
+            />
+          </div>
+          <div id="error-message" class="text-sm text-destructive hidden"></div>
+          <div id="success-message" class="text-sm text-green-600 hidden"></div>
+          <Button type="submit">
+            Save changes
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+
+    <Card class="mt-6">
+      <CardHeader>
+        <CardTitle>Password</CardTitle>
+        <CardDescription>Change your password</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form id="password-form" class="space-y-4">
+          <div class="space-y-2">
+            <Label for="newPassword">New Password</Label>
+            <Input
+              id="newPassword"
+              name="newPassword"
+              type="password"
+              minlength="8"
+              required
+            />
+          </div>
+          <div class="space-y-2">
+            <Label for="confirmPassword">Confirm New Password</Label>
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              minlength="8"
+              required
+            />
+          </div>
+          <div id="password-error" class="text-sm text-destructive hidden"></div>
+          <div id="password-success" class="text-sm text-green-600 hidden"></div>
+          <Button type="submit">
+            Update password
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  </div>
+  <Footer />
+</BaseLayout>
+
+<script>
+  import { updateProfile } from '@/lib/supabase/utils';
+  import { updatePassword } from '@/lib/auth/config';
+  import { createClient } from '@/lib/supabase/client';
+
+  const profileForm = document.getElementById('profile-form') as HTMLFormElement;
+  const passwordForm = document.getElementById('password-form') as HTMLFormElement;
+  const errorMessage = document.getElementById('error-message') as HTMLDivElement;
+  const successMessage = document.getElementById('success-message') as HTMLDivElement;
+  const passwordError = document.getElementById('password-error') as HTMLDivElement;
+  const passwordSuccess = document.getElementById('password-success') as HTMLDivElement;
+
+  // Handle profile update
+  profileForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(profileForm);
+    const fullName = formData.get('fullName') as string;
+    const avatarUrl = formData.get('avatarUrl') as string;
+
+    // Clear messages
+    errorMessage.textContent = '';
+    errorMessage.classList.add('hidden');
+    successMessage.textContent = '';
+    successMessage.classList.add('hidden');
+
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        errorMessage.textContent = 'You must be logged in to update your profile';
+        errorMessage.classList.remove('hidden');
+        return;
+      }
+
+      await updateProfile(supabase, user.id, {
+        full_name: fullName,
+        avatar_url: avatarUrl || null,
+      });
+
+      successMessage.textContent = 'Profile updated successfully!';
+      successMessage.classList.remove('hidden');
+    } catch (err: any) {
+      errorMessage.textContent = err.message || 'Failed to update profile';
+      errorMessage.classList.remove('hidden');
+    }
+  });
+
+  // Handle password update
+  passwordForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(passwordForm);
+    const newPassword = formData.get('newPassword') as string;
+    const confirmPassword = formData.get('confirmPassword') as string;
+
+    // Clear messages
+    passwordError.textContent = '';
+    passwordError.classList.add('hidden');
+    passwordSuccess.textContent = '';
+    passwordSuccess.classList.add('hidden');
+
+    if (newPassword !== confirmPassword) {
+      passwordError.textContent = 'Passwords do not match';
+      passwordError.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const { error } = await updatePassword(newPassword);
+      
+      if (error) {
+        passwordError.textContent = error.message;
+        passwordError.classList.remove('hidden');
+        return;
+      }
+
+      passwordSuccess.textContent = 'Password updated successfully!';
+      passwordSuccess.classList.remove('hidden');
+      passwordForm.reset();
+    } catch (err) {
+      passwordError.textContent = 'Failed to update password';
+      passwordError.classList.remove('hidden');
+    }
+  });
+</script>

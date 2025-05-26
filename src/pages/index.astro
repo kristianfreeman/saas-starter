@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { Navigation } from '@/components/navigation';
+import NavigationWrapper from '@/components/navigation-wrapper.astro';
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,7 +57,7 @@ const pricingPlans = [
 ---
 
 <BaseLayout title="SaaS Starter - Modern SaaS Template">
-  <Navigation client:load />
+  <NavigationWrapper />
   
   <main>
     <!-- Hero Section -->
@@ -74,7 +74,7 @@ const pricingPlans = [
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6">
             <Button size="lg" asChild>
-              <a href="/register">Get Started</a>
+              <a href="/auth/register">Get Started</a>
             </Button>
             <Button variant="outline" size="lg" asChild>
               <a href="/docs">View Documentation</a>
@@ -163,7 +163,7 @@ const pricingPlans = [
           </p>
           <div className="mt-10 flex items-center justify-center gap-x-6">
             <Button size="lg" asChild>
-              <a href="/register">Start Building Today</a>
+              <a href="/auth/register">Start Building Today</a>
             </Button>
             <Button variant="ghost" size="lg" asChild>
               <a href="/contact">Contact Sales</a>
