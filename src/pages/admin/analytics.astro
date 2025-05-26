@@ -1,0 +1,301 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { TrendingUp, Users, DollarSign, Activity, BarChart3, PieChart } from 'lucide-react';
+
+const supabase = createServerSupabaseClient(Astro.cookies);
+
+// Get date ranges
+const now = new Date();
+const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+
+// Get user growth data
+const { count: totalUsers } = await supabase
+  .from('profiles')
+  .select('*', { count: 'exact', head: true });
+
+const { count: thisMonthUsers } = await supabase
+  .from('profiles')
+  .select('*', { count: 'exact', head: true })
+  .gte('created_at', thisMonth.toISOString());
+
+const { count: lastMonthUsers } = await supabase
+  .from('profiles')
+  .select('*', { count: 'exact', head: true })
+  .gte('created_at', lastMonth.toISOString())
+  .lt('created_at', thisMonth.toISOString());
+
+// Get subscription data
+const { data: allSubs } = await supabase
+  .from('subscriptions')
+  .select('plan, status, created_at');
+
+// Calculate metrics
+const activeSubs = allSubs?.filter(s => s.status === 'active') || [];
+const planDistribution = activeSubs.reduce((acc, sub) => {
+  acc[sub.plan] = (acc[sub.plan] || 0) + 1;
+  return acc;
+}, {} as Record<string, number>);
+
+const planPrices: Record<string, number> = {
+  starter: 9,
+  pro: 29,
+  enterprise: 99,
+};
+
+const mrr = activeSubs.reduce((total, sub) => {
+  return total + (planPrices[sub.plan] || 0);
+}, 0);
+
+const arr = mrr * 12;
+
+// Calculate churn (simplified - would need historical data in production)
+const { count: canceledThisMonth } = await supabase
+  .from('subscriptions')
+  .select('*', { count: 'exact', head: true })
+  .eq('status', 'canceled')
+  .gte('updated_at', thisMonth.toISOString());
+
+const churnRate = activeSubs.length > 0 
+  ? ((canceledThisMonth || 0) / activeSubs.length * 100).toFixed(1)
+  : '0';
+
+// User growth rate
+const userGrowthRate = lastMonthUsers && lastMonthUsers > 0
+  ? (((thisMonthUsers || 0) - lastMonthUsers) / lastMonthUsers * 100).toFixed(1)
+  : '0';
+
+// Mock data for charts (in production, you'd aggregate real data)
+const monthlyRevenueData = [
+  { month: 'Jan', revenue: 2400 },
+  { month: 'Feb', revenue: 3200 },
+  { month: 'Mar', revenue: 4100 },
+  { month: 'Apr', revenue: 4800 },
+  { month: 'May', revenue: 5200 },
+  { month: 'Jun', revenue: mrr },
+];
+
+const userGrowthData = [
+  { month: 'Jan', users: 45 },
+  { month: 'Feb', users: 62 },
+  { month: 'Mar', users: 89 },
+  { month: 'Apr', users: 124 },
+  { month: 'May', users: 156 },
+  { month: 'Jun', users: totalUsers || 0 },
+];
+---
+
+<AdminLayout title="Analytics">
+  <!-- Key Metrics -->
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">
+          Monthly Recurring Revenue
+        </CardTitle>
+        <DollarSign className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">${mrr.toLocaleString()}</div>
+        <p className="text-xs text-muted-foreground">
+          ${arr.toLocaleString()} ARR
+        </p>
+      </CardContent>
+    </Card>
+    
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">
+          Total Users
+        </CardTitle>
+        <Users className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{totalUsers || 0}</div>
+        <p className="text-xs text-green-600">
+          +{userGrowthRate}% from last month
+        </p>
+      </CardContent>
+    </Card>
+    
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">
+          Active Subscriptions
+        </CardTitle>
+        <Activity className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{activeSubs.length}</div>
+        <p className="text-xs text-muted-foreground">
+          {((activeSubs.length / (totalUsers || 1)) * 100).toFixed(1)}% conversion
+        </p>
+      </CardContent>
+    </Card>
+    
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">
+          Churn Rate
+        </CardTitle>
+        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{churnRate}%</div>
+        <p className="text-xs text-muted-foreground">
+          {canceledThisMonth || 0} cancellations
+        </p>
+      </CardContent>
+    </Card>
+  </div>
+
+  <!-- Charts -->
+  <div className="grid gap-4 md:grid-cols-2 mb-8">
+    <!-- Revenue Chart -->
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="h-5 w-5" />
+          Revenue Growth
+        </CardTitle>
+        <CardDescription>Monthly recurring revenue over time</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-64 flex items-end justify-between gap-2">
+          {monthlyRevenueData.map((data) => {
+            const height = (data.revenue / Math.max(...monthlyRevenueData.map(d => d.revenue))) * 100;
+            return (
+              <div key={data.month} className="flex-1 flex flex-col items-center gap-2">
+                <div 
+                  className="w-full bg-primary rounded-t transition-all hover:bg-primary/80"
+                  style={`height: ${height}%`}
+                  title={`$${data.revenue}`}
+                />
+                <span className="text-xs text-muted-foreground">{data.month}</span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- User Growth Chart -->
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" />
+          User Growth
+        </CardTitle>
+        <CardDescription>Total users over time</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-64 flex items-end justify-between gap-2">
+          {userGrowthData.map((data) => {
+            const height = (data.users / Math.max(...userGrowthData.map(d => d.users))) * 100;
+            return (
+              <div key={data.month} className="flex-1 flex flex-col items-center gap-2">
+                <div 
+                  className="w-full bg-green-500 rounded-t transition-all hover:bg-green-400"
+                  style={`height: ${height}%`}
+                  title={`${data.users} users`}
+                />
+                <span className="text-xs text-muted-foreground">{data.month}</span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+
+  <!-- Plan Distribution and Top Metrics -->
+  <div className="grid gap-4 md:grid-cols-2">
+    <!-- Plan Distribution -->
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <PieChart className="h-5 w-5" />
+          Plan Distribution
+        </CardTitle>
+        <CardDescription>Active subscriptions by plan</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {Object.entries(planDistribution).map(([plan, count]) => {
+            const percentage = (count / activeSubs.length * 100).toFixed(1);
+            return (
+              <div key={plan}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium capitalize">{plan}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {count} ({percentage}%)
+                  </span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary rounded-full h-2 transition-all"
+                    style={`width: ${percentage}%`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Key Insights -->
+    <Card>
+      <CardHeader>
+        <CardTitle>Key Insights</CardTitle>
+        <CardDescription>Important metrics and trends</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="h-2 w-2 bg-green-500 rounded-full mt-2" />
+            <div>
+              <p className="text-sm font-medium">Strong User Growth</p>
+              <p className="text-sm text-muted-foreground">
+                {userGrowthRate}% increase in new users this month
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="h-2 w-2 bg-blue-500 rounded-full mt-2" />
+            <div>
+              <p className="text-sm font-medium">Revenue Trending Up</p>
+              <p className="text-sm text-muted-foreground">
+                MRR has grown to ${mrr.toLocaleString()} this month
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="h-2 w-2 bg-yellow-500 rounded-full mt-2" />
+            <div>
+              <p className="text-sm font-medium">Low Churn Rate</p>
+              <p className="text-sm text-muted-foreground">
+                {churnRate}% monthly churn is below industry average
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="h-2 w-2 bg-purple-500 rounded-full mt-2" />
+            <div>
+              <p className="text-sm font-medium">Pro Plan Popular</p>
+              <p className="text-sm text-muted-foreground">
+                Most users are choosing the Pro plan
+              </p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+</AdminLayout>

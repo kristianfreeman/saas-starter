@@ -1,0 +1,379 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getUser } from '@/lib/supabase/server';
+import { getUserRole, isAdmin } from '@/lib/permissions';
+
+// Check admin access
+const user = await getUser(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/auth/login');
+}
+
+const supabase = createServerSupabaseClient(Astro.cookies);
+const role = await getUserRole(supabase, user.id);
+
+if (!isAdmin(role)) {
+  return Astro.redirect('/dashboard?error=insufficient_permissions');
+}
+
+// Get system health metrics
+const getDatabaseHealth = async () => {
+  try {
+    const startTime = Date.now();
+    const { error } = await supabase.from('profiles').select('id').limit(1);
+    const responseTime = Date.now() - startTime;
+    
+    return {
+      status: error ? 'unhealthy' : 'healthy',
+      responseTime,
+      error: error?.message
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      responseTime: 0,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+const getAuthHealth = async () => {
+  try {
+    // Since we're already authenticated, check if we can query a protected table
+    const { error } = await supabase.from('profiles').select('id').limit(1);
+    return {
+      status: error ? 'unhealthy' : 'healthy',
+      hasValidSession: true, // We know it's valid since we're on this page
+      error: error?.message
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      hasValidSession: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+const getEmailHealth = async () => {
+  // Check if email service environment variables are configured
+  const isConfigured = !!import.meta.env.RESEND_API_KEY;
+  return {
+    status: isConfigured ? 'healthy' : 'unhealthy',
+    isConfigured,
+    error: isConfigured ? null : 'Email service not configured'
+  };
+};
+
+const getStripeHealth = async () => {
+  // Check if Stripe environment variables are configured
+  const isConfigured = !!import.meta.env.STRIPE_SECRET_KEY;
+  return {
+    status: isConfigured ? 'healthy' : 'unhealthy',
+    isConfigured,
+    error: isConfigured ? null : 'Stripe not configured'
+  };
+};
+
+// Get memory usage
+const getMemoryUsage = () => {
+  if (typeof process !== 'undefined' && process.memoryUsage) {
+    const usage = process.memoryUsage();
+    return {
+      heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
+      rss: Math.round(usage.rss / 1024 / 1024),
+      external: Math.round((usage.external || 0) / 1024 / 1024)
+    };
+  }
+  return null;
+};
+
+// Get uptime
+const getUptime = () => {
+  if (typeof process !== 'undefined' && process.uptime) {
+    const uptimeSeconds = process.uptime();
+    const days = Math.floor(uptimeSeconds / 86400);
+    const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+    return { days, hours, minutes, totalSeconds: uptimeSeconds };
+  }
+  return null;
+};
+
+// Collect all health data
+const [dbHealth, authHealth, emailHealth, stripeHealth] = await Promise.all([
+  getDatabaseHealth(),
+  getAuthHealth(),
+  getEmailHealth(),
+  getStripeHealth()
+]);
+
+const memoryUsage = getMemoryUsage();
+const uptime = getUptime();
+
+// Calculate overall system status
+const services = [dbHealth, authHealth, emailHealth, stripeHealth];
+const unhealthyCount = services.filter(s => s.status === 'unhealthy').length;
+const overallStatus = unhealthyCount === 0 ? 'healthy' : unhealthyCount >= 2 ? 'critical' : 'degraded';
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'healthy': return 'text-green-600';
+    case 'degraded': return 'text-yellow-600';
+    case 'critical': return 'text-red-600';
+    case 'unhealthy': return 'text-red-600';
+    default: return 'text-gray-600';
+  }
+};
+
+const getStatusBgColor = (status: string) => {
+  switch (status) {
+    case 'healthy': return 'bg-green-100';
+    case 'degraded': return 'bg-yellow-100';
+    case 'critical': return 'bg-red-100';
+    case 'unhealthy': return 'bg-red-100';
+    default: return 'bg-gray-100';
+  }
+};
+---
+
+<AdminLayout title="System Health" description="Monitor system status and service health">
+    <div class="space-y-6">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">System Health</h1>
+        <p class="text-muted-foreground">Monitor system status and service health</p>
+      </div>
+
+      {/* Overall Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle>System Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="flex items-center space-x-4">
+            <div class={`w-4 h-4 rounded-full ${getStatusBgColor(overallStatus)}`}></div>
+            <span class={`text-2xl font-semibold capitalize ${getStatusColor(overallStatus)}`}>
+              {overallStatus}
+            </span>
+            {overallStatus !== 'healthy' && (
+              <span class="text-sm text-muted-foreground">
+                {unhealthyCount} service{unhealthyCount > 1 ? 's' : ''} experiencing issues
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Services Grid */}
+      <div class="grid gap-4 md:grid-cols-2">
+        {/* Database Health */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Database</CardTitle>
+            <CardDescription>Supabase connection status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span>Status</span>
+                <span class={`font-medium capitalize ${getStatusColor(dbHealth.status)}`}>
+                  {dbHealth.status}
+                </span>
+              </div>
+              {dbHealth.responseTime > 0 && (
+                <div class="flex items-center justify-between">
+                  <span>Response Time</span>
+                  <span class="font-mono">{dbHealth.responseTime}ms</span>
+                </div>
+              )}
+              {dbHealth.error && (
+                <div class="mt-2 p-2 bg-red-50 rounded text-sm text-red-600">
+                  {dbHealth.error}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Auth Health */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Authentication</CardTitle>
+            <CardDescription>Auth service status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span>Status</span>
+                <span class={`font-medium capitalize ${getStatusColor(authHealth.status)}`}>
+                  {authHealth.status}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Session Valid</span>
+                <span class={authHealth.hasValidSession ? 'text-green-600' : 'text-gray-500'}>
+                  {authHealth.hasValidSession ? 'Yes' : 'No'}
+                </span>
+              </div>
+              {authHealth.error && (
+                <div class="mt-2 p-2 bg-red-50 rounded text-sm text-red-600">
+                  {authHealth.error}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Email Health */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Service</CardTitle>
+            <CardDescription>Resend email service</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span>Status</span>
+                <span class={`font-medium capitalize ${getStatusColor(emailHealth.status)}`}>
+                  {emailHealth.status}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Configured</span>
+                <span class={emailHealth.isConfigured ? 'text-green-600' : 'text-red-600'}>
+                  {emailHealth.isConfigured ? 'Yes' : 'No'}
+                </span>
+              </div>
+              {emailHealth.error && (
+                <div class="mt-2 p-2 bg-red-50 rounded text-sm text-red-600">
+                  {emailHealth.error}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stripe Health */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Service</CardTitle>
+            <CardDescription>Stripe payment service</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span>Status</span>
+                <span class={`font-medium capitalize ${getStatusColor(stripeHealth.status)}`}>
+                  {stripeHealth.status}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Configured</span>
+                <span class={stripeHealth.isConfigured ? 'text-green-600' : 'text-red-600'}>
+                  {stripeHealth.isConfigured ? 'Yes' : 'No'}
+                </span>
+              </div>
+              {stripeHealth.error && (
+                <div class="mt-2 p-2 bg-red-50 rounded text-sm text-red-600">
+                  {stripeHealth.error}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* System Resources */}
+      <div class="grid gap-4 md:grid-cols-2">
+        {/* Memory Usage */}
+        {memoryUsage && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Memory Usage</CardTitle>
+              <CardDescription>Current memory consumption</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span>Heap Used</span>
+                  <span class="font-mono">{memoryUsage.heapUsed} MB</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>Heap Total</span>
+                  <span class="font-mono">{memoryUsage.heapTotal} MB</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>RSS</span>
+                  <span class="font-mono">{memoryUsage.rss} MB</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span>External</span>
+                  <span class="font-mono">{memoryUsage.external} MB</span>
+                </div>
+                <div class="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    class="h-full bg-blue-600 transition-all"
+                    style={`width: ${(memoryUsage.heapUsed / memoryUsage.heapTotal) * 100}%`}
+                  ></div>
+                </div>
+                <div class="text-sm text-muted-foreground text-center">
+                  {Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100)}% heap usage
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Uptime */}
+        {uptime && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Uptime</CardTitle>
+              <CardDescription>System availability</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div class="text-center">
+                <div class="text-3xl font-bold">
+                  {uptime.days}d {uptime.hours}h {uptime.minutes}m
+                </div>
+                <div class="text-sm text-muted-foreground mt-2">
+                  Since last restart
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Environment Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Environment Information</CardTitle>
+          <CardDescription>Runtime and configuration details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span>Node Version</span>
+              <span class="font-mono">{typeof process !== 'undefined' ? process.version : 'N/A'}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span>Environment</span>
+              <span class="font-mono">{import.meta.env.MODE}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span>Build</span>
+              <span class="font-mono">{import.meta.env.PROD ? 'Production' : 'Development'}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span>Last Check</span>
+              <span class="font-mono">{new Date().toLocaleString()}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+</AdminLayout>

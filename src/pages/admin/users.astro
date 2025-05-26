@@ -1,0 +1,237 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { Search, Filter, MoreVertical, Mail, Shield, Calendar } from 'lucide-react';
+import { UserRole } from '@/lib/permissions';
+
+const supabase = createServerSupabaseClient(Astro.cookies);
+
+// Get query parameters
+const url = new URL(Astro.request.url);
+const search = url.searchParams.get('search') || '';
+const role = url.searchParams.get('role') || '';
+const page = parseInt(url.searchParams.get('page') || '1');
+const limit = 10;
+
+// Build query
+let query = supabase
+  .from('profiles')
+  .select('*', { count: 'exact' })
+  .order('created_at', { ascending: false });
+
+// Apply search filter
+if (search) {
+  query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
+}
+
+// Apply role filter
+if (role) {
+  query = query.eq('role', role);
+}
+
+// Apply pagination
+const { data: users, count } = await query
+  .range((page - 1) * limit, page * limit - 1);
+
+const totalPages = Math.ceil((count || 0) / limit);
+
+// Get subscription data for users
+const userIds = users?.map(u => u.id) || [];
+const { data: subscriptions } = await supabase
+  .from('subscriptions')
+  .select('user_id, plan, status')
+  .in('user_id', userIds)
+  .eq('status', 'active');
+
+const subscriptionMap = new Map(
+  subscriptions?.map(s => [s.user_id, s]) || []
+);
+---
+
+<AdminLayout title="User Management">
+  <!-- Search and Filters -->
+  <Card className="mb-6">
+    <CardHeader>
+      <CardTitle>Users</CardTitle>
+      <CardDescription>Manage and monitor user accounts</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form method="get" className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            name="search"
+            placeholder="Search by email or name..."
+            value={search}
+            className="pl-9"
+          />
+        </div>
+        <select
+          name="role"
+          className="flex h-10 w-full sm:w-48 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">All Roles</option>
+          <option value={UserRole.USER} selected={role === UserRole.USER}>
+            Users
+          </option>
+          <option value={UserRole.ADMIN} selected={role === UserRole.ADMIN}>
+            Admins
+          </option>
+          <option value={UserRole.SUPER_ADMIN} selected={role === UserRole.SUPER_ADMIN}>
+            Super Admins
+          </option>
+        </select>
+        <Button type="submit">
+          <Filter className="mr-2 h-4 w-4" />
+          Filter
+        </Button>
+      </form>
+    </CardContent>
+  </Card>
+
+  <!-- Users Table -->
+  <Card>
+    <CardContent className="p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b">
+              <th className="p-4 text-left text-sm font-medium text-muted-foreground">
+                User
+              </th>
+              <th className="p-4 text-left text-sm font-medium text-muted-foreground">
+                Role
+              </th>
+              <th className="p-4 text-left text-sm font-medium text-muted-foreground">
+                Subscription
+              </th>
+              <th className="p-4 text-left text-sm font-medium text-muted-foreground">
+                Joined
+              </th>
+              <th className="p-4 text-left text-sm font-medium text-muted-foreground">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {users?.map((user) => {
+              const subscription = subscriptionMap.get(user.id);
+              return (
+                <tr key={user.id} className="border-b hover:bg-muted/50">
+                  <td className="p-4">
+                    <div>
+                      <p className="font-medium">
+                        {user.full_name || 'Unnamed User'}
+                      </p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {user.email}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <Badge 
+                      variant={
+                        user.role === UserRole.SUPER_ADMIN ? 'destructive' :
+                        user.role === UserRole.ADMIN ? 'default' :
+                        'secondary'
+                      }
+                    >
+                      <Shield className="mr-1 h-3 w-3" />
+                      {user.role || UserRole.USER}
+                    </Badge>
+                  </td>
+                  <td className="p-4">
+                    {subscription ? (
+                      <div>
+                        <p className="text-sm font-medium capitalize">
+                          {subscription.plan}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Active
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        No subscription
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        asChild
+                      >
+                        <a href={`/admin/users/${user.id}`}>
+                          View
+                        </a>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            }) || (
+              <tr>
+                <td colSpan="5" className="p-8 text-center text-muted-foreground">
+                  No users found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between p-4 border-t">
+          <p className="text-sm text-muted-foreground">
+            Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, count || 0)} of {count || 0} users
+          </p>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+              >
+                <a href={`?page=${page - 1}${search ? `&search=${search}` : ''}${role ? `&role=${role}` : ''}`}>
+                  Previous
+                </a>
+              </Button>
+            )}
+            {page < totalPages && (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+              >
+                <a href={`?page=${page + 1}${search ? `&search=${search}` : ''}${role ? `&role=${role}` : ''}`}>
+                  Next
+                </a>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</AdminLayout>

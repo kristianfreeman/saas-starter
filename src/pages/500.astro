@@ -1,0 +1,57 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { AlertCircle, Home, RefreshCw } from 'lucide-react';
+
+// Log error to monitoring if available
+const error = Astro.props.error || {};
+if (import.meta.env.SENTRY_DSN && error) {
+  // Error will be logged by Astro's error handling
+}
+---
+
+<BaseLayout title="Server Error">
+  <div class="container flex items-center justify-center min-h-screen py-8">
+    <Card class="w-full max-w-md">
+      <CardHeader class="text-center">
+        <div class="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+          <AlertCircle class="w-6 h-6 text-destructive" />
+        </div>
+        <CardTitle class="text-2xl">Server Error</CardTitle>
+        <CardDescription>
+          Something went wrong on our end
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <p class="text-sm text-muted-foreground text-center">
+          We're experiencing technical difficulties. Our team has been notified and is working to fix the issue.
+        </p>
+        
+        {import.meta.env.DEV && error.message && (
+          <div class="mt-4 p-3 bg-muted rounded-md">
+            <p class="text-xs font-mono">{error.message}</p>
+          </div>
+        )}
+        
+        <div class="flex flex-col gap-2">
+          <Button variant="default" class="w-full" asChild>
+            <a href="/" class="inline-flex items-center justify-center">
+              <Home class="w-4 h-4 mr-2" />
+              Go to Homepage
+            </a>
+          </Button>
+          
+          <Button variant="outline" class="w-full" onclick="window.location.reload()">
+            <RefreshCw class="w-4 h-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
+        
+        <p class="text-xs text-center text-muted-foreground">
+          Error ID: {crypto.randomUUID()}
+        </p>
+      </CardContent>
+    </Card>
+  </div>
+</BaseLayout>

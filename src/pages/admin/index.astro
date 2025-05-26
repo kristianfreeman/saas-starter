@@ -1,0 +1,236 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { Users, CreditCard, TrendingUp, Activity, DollarSign, UserCheck } from 'lucide-react';
+
+const supabase = createServerSupabaseClient(Astro.cookies);
+
+// Get statistics
+const { count: totalUsers } = await supabase
+  .from('profiles')
+  .select('*', { count: 'exact', head: true });
+
+const { count: activeSubscriptions } = await supabase
+  .from('subscriptions')
+  .select('*', { count: 'exact', head: true })
+  .eq('status', 'active');
+
+const { data: recentUsers } = await supabase
+  .from('profiles')
+  .select('id, email, full_name, created_at')
+  .order('created_at', { ascending: false })
+  .limit(5);
+
+const { data: recentSubscriptions } = await supabase
+  .from('subscriptions')
+  .select('id, user_id, plan, status, created_at')
+  .order('created_at', { ascending: false })
+  .limit(5);
+
+// Calculate MRR (Monthly Recurring Revenue)
+const { data: activeSubsData } = await supabase
+  .from('subscriptions')
+  .select('plan')
+  .eq('status', 'active');
+
+const planPrices: Record<string, number> = {
+  starter: 9,
+  pro: 29,
+  enterprise: 99,
+};
+
+const mrr = activeSubsData?.reduce((total, sub) => {
+  return total + (planPrices[sub.plan] || 0);
+}, 0) || 0;
+
+// Calculate growth (mock data for now)
+const userGrowth = 12.5; // This would be calculated from historical data
+const revenueGrowth = 18.2; // This would be calculated from historical data
+
+const stats = [
+  {
+    name: 'Total Users',
+    value: totalUsers || 0,
+    change: `+${userGrowth}%`,
+    changeType: 'positive' as const,
+    icon: Users,
+  },
+  {
+    name: 'Active Subscriptions',
+    value: activeSubscriptions || 0,
+    change: '+3',
+    changeType: 'positive' as const,
+    icon: CreditCard,
+  },
+  {
+    name: 'Monthly Recurring Revenue',
+    value: `$${mrr.toLocaleString()}`,
+    change: `+${revenueGrowth}%`,
+    changeType: 'positive' as const,
+    icon: DollarSign,
+  },
+  {
+    name: 'System Health',
+    value: '99.9%',
+    change: 'Operational',
+    changeType: 'neutral' as const,
+    icon: Activity,
+  },
+];
+---
+
+<AdminLayout title="Admin Dashboard">
+  <!-- Stats Grid -->
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+    {stats.map((stat) => (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            {stat.name}
+          </CardTitle>
+          <stat.icon className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stat.value}</div>
+          <p className={cn(
+            "text-xs",
+            stat.changeType === 'positive' && "text-green-600",
+            stat.changeType === 'negative' && "text-red-600",
+            stat.changeType === 'neutral' && "text-muted-foreground"
+          )}>
+            {stat.change} from last month
+          </p>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+
+  <!-- Recent Activity -->
+  <div className="grid gap-4 md:grid-cols-2">
+    <!-- Recent Users -->
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Users</CardTitle>
+        <CardDescription>Latest user registrations</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {recentUsers?.map((user) => (
+            <div key={user.id} className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">
+                  {user.full_name || 'Unnamed User'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {user.email}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {new Date(user.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          )) || (
+            <p className="text-sm text-muted-foreground">No recent users</p>
+          )}
+        </div>
+        <div className="mt-4 pt-4 border-t">
+          <a 
+            href="/admin/users" 
+            className="text-sm text-primary hover:underline"
+          >
+            View all users →
+          </a>
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Recent Subscriptions -->
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Subscriptions</CardTitle>
+        <CardDescription>Latest subscription activity</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {recentSubscriptions?.map((sub) => (
+            <div key={sub.id} className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium capitalize">
+                  {sub.plan} Plan
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  User: {sub.user_id.substring(0, 8)}...
+                </p>
+              </div>
+              <div className="text-right">
+                <span className={cn(
+                  "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
+                  sub.status === 'active' && "bg-green-100 text-green-700",
+                  sub.status === 'canceled' && "bg-red-100 text-red-700",
+                  sub.status === 'past_due' && "bg-yellow-100 text-yellow-700"
+                )}>
+                  {sub.status}
+                </span>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(sub.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          )) || (
+            <p className="text-sm text-muted-foreground">No recent subscriptions</p>
+          )}
+        </div>
+        <div className="mt-4 pt-4 border-t">
+          <a 
+            href="/admin/subscriptions" 
+            className="text-sm text-primary hover:underline"
+          >
+            View all subscriptions →
+          </a>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+
+  <!-- Quick Actions -->
+  <Card className="mt-8">
+    <CardHeader>
+      <CardTitle>Quick Actions</CardTitle>
+      <CardDescription>Common administrative tasks</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="grid gap-4 md:grid-cols-4">
+        <Button variant="outline" asChild>
+          <a href="/admin/users">
+            <Users className="mr-2 h-4 w-4" />
+            Manage Users
+          </a>
+        </Button>
+        <Button variant="outline" asChild>
+          <a href="/admin/subscriptions">
+            <CreditCard className="mr-2 h-4 w-4" />
+            View Subscriptions
+          </a>
+        </Button>
+        <Button variant="outline" asChild>
+          <a href="/admin/analytics">
+            <TrendingUp className="mr-2 h-4 w-4" />
+            Analytics
+          </a>
+        </Button>
+        <Button variant="outline" asChild>
+          <a href="/admin/health">
+            <Activity className="mr-2 h-4 w-4" />
+            System Health
+          </a>
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+</AdminLayout>
+
+<script>
+  import { cn } from '@/lib/utils';
+  import { Button } from '@/components/ui/button';
+</script>

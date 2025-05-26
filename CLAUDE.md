@@ -32,3 +32,6 @@ The codebase follows Astro's conventions:
 
 ### AI Development Guidelines
 - Use web search to understand how to implement code whenever you work on a feature
+
+### Important Notes
+- Due to ShadCN + React issues, you will need to ask me to run these commands myself

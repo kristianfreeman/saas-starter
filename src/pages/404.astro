@@ -1,0 +1,52 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { FileQuestion, Home, Search } from 'lucide-react';
+---
+
+<BaseLayout title="Page Not Found">
+  <div class="container flex items-center justify-center min-h-screen py-8">
+    <Card class="w-full max-w-md">
+      <CardHeader class="text-center">
+        <div class="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+          <FileQuestion class="w-6 h-6 text-muted-foreground" />
+        </div>
+        <CardTitle class="text-2xl">Page Not Found</CardTitle>
+        <CardDescription>
+          The page you're looking for doesn't exist
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <p class="text-sm text-muted-foreground text-center">
+          The page you requested could not be found. It may have been moved, deleted, or you may have mistyped the URL.
+        </p>
+        
+        <div class="flex flex-col gap-2">
+          <Button variant="default" class="w-full" asChild>
+            <a href="/" class="inline-flex items-center justify-center">
+              <Home class="w-4 h-4 mr-2" />
+              Go to Homepage
+            </a>
+          </Button>
+          
+          <Button variant="outline" class="w-full" asChild>
+            <a href="/dashboard" class="inline-flex items-center justify-center">
+              <Search class="w-4 h-4 mr-2" />
+              Go to Dashboard
+            </a>
+          </Button>
+        </div>
+        
+        <div class="text-center pt-4">
+          <p class="text-xs text-muted-foreground">
+            If you believe this is an error, please{' '}
+            <a href="mailto:support@example.com" class="text-primary hover:underline">
+              contact support
+            </a>
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+</BaseLayout>

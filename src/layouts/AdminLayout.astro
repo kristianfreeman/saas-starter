@@ -1,0 +1,62 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { AdminNavigation } from '@/components/admin-navigation';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { getUser } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getUserRole, isAdmin } from '@/lib/permissions';
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+
+// Check admin access
+const user = await getUser(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/auth/login');
+}
+
+const supabase = createServerSupabaseClient(Astro.cookies);
+const role = await getUserRole(supabase, user.id);
+
+if (!isAdmin(role)) {
+  return Astro.redirect('/dashboard?error=insufficient_permissions');
+}
+
+const currentPath = Astro.url.pathname;
+---
+
+<BaseLayout title={`${title} - Admin`} description={description}>
+  <div className="flex h-screen bg-background">
+    <AdminNavigation client:load currentPath={currentPath} />
+    
+    <div className="flex flex-1 flex-col lg:pl-72">
+      {/* Top Bar */}
+      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-1 items-center justify-between">
+          <h1 className="text-2xl font-semibold">{title}</h1>
+          <div className="flex items-center gap-4">
+            <ThemeToggle client:load />
+            <span className="text-sm text-muted-foreground">
+              {user.email}
+            </span>
+            <Button variant="outline" size="sm" asChild>
+              <a href="/dashboard">Exit Admin</a>
+            </Button>
+          </div>
+        </div>
+      </header>
+      
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="py-8 px-4 sm:px-6 lg:px-8">
+          <slot />
+        </div>
+      </main>
+    </div>
+  </div>
+</BaseLayout>

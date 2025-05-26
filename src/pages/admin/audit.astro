@@ -1,0 +1,277 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getUser } from '@/lib/supabase/server';
+import { getUserRole, isAdmin } from '@/lib/permissions';
+import { formatDistanceToNow } from 'date-fns';
+
+// Check admin access
+const user = await getUser(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/auth/login');
+}
+
+const supabase = createServerSupabaseClient(Astro.cookies);
+const role = await getUserRole(supabase, user.id);
+
+if (!isAdmin(role)) {
+  return Astro.redirect('/dashboard?error=insufficient_permissions');
+}
+
+// Get audit logs with pagination
+const page = parseInt(Astro.url.searchParams.get('page') || '1');
+const limit = 50;
+const offset = (page - 1) * limit;
+
+// Get filters from query params
+const userFilter = Astro.url.searchParams.get('user') || '';
+const actionFilter = Astro.url.searchParams.get('action') || '';
+const resourceFilter = Astro.url.searchParams.get('resource') || '';
+
+// Build query
+let query = supabase
+  .from('audit_logs')
+  .select(`
+    *,
+    profiles!audit_logs_user_id_fkey(
+      email,
+      full_name
+    )
+  `, { count: 'exact' })
+  .order('created_at', { ascending: false })
+  .range(offset, offset + limit - 1);
+
+// Apply filters
+if (userFilter) {
+  query = query.eq('user_id', userFilter);
+}
+if (actionFilter) {
+  query = query.ilike('action', `%${actionFilter}%`);
+}
+if (resourceFilter) {
+  query = query.eq('resource_type', resourceFilter);
+}
+
+const { data: logs, count } = await query;
+
+// Get distinct actions and resource types for filters
+const { data: distinctActions } = await supabase
+  .from('audit_logs')
+  .select('action')
+  .limit(100);
+
+const uniqueActions = [...new Set(distinctActions?.map(l => l.action.split('.')[0]) || [])];
+
+const { data: distinctResources } = await supabase
+  .from('audit_logs')
+  .select('resource_type')
+  .limit(100);
+
+const uniqueResources = [...new Set(distinctResources?.map(l => l.resource_type) || [])];
+
+// Calculate pagination
+const totalPages = Math.ceil((count || 0) / limit);
+const hasNext = page < totalPages;
+const hasPrev = page > 1;
+
+// Helper functions
+const getActionColor = (action: string) => {
+  if (action.startsWith('auth.')) return 'bg-blue-100 text-blue-800';
+  if (action.startsWith('user.')) return 'bg-green-100 text-green-800';
+  if (action.startsWith('admin.')) return 'bg-purple-100 text-purple-800';
+  if (action.startsWith('subscription.')) return 'bg-yellow-100 text-yellow-800';
+  if (action.startsWith('system.')) return 'bg-gray-100 text-gray-800';
+  return 'bg-gray-100 text-gray-800';
+};
+
+const formatDetails = (details: any) => {
+  if (!details) return '-';
+  if (typeof details === 'string') return details;
+  return JSON.stringify(details, null, 2);
+};
+---
+
+<AdminLayout title="Audit Logs" description="View system activity and changes">
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">Audit Logs</h1>
+      <p class="text-muted-foreground">Track all administrative actions and system events</p>
+    </div>
+
+    {/* Filters */}
+    <Card>
+      <CardHeader>
+        <CardTitle>Filters</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form method="get" class="flex flex-wrap gap-4">
+          <div class="flex-1 min-w-[200px]">
+            <label for="action" class="block text-sm font-medium mb-1">Action Type</label>
+            <select
+              id="action"
+              name="action"
+              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">All Actions</option>
+              {uniqueActions.map(action => (
+                <option value={action} selected={actionFilter.startsWith(action)}>
+                  {action}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div class="flex-1 min-w-[200px]">
+            <label for="resource" class="block text-sm font-medium mb-1">Resource Type</label>
+            <select
+              id="resource"
+              name="resource"
+              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">All Resources</option>
+              {uniqueResources.map(resource => (
+                <option value={resource} selected={resourceFilter === resource}>
+                  {resource}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div class="flex items-end gap-2">
+            <button
+              type="submit"
+              class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Apply Filters
+            </button>
+            {(actionFilter || resourceFilter || userFilter) && (
+              <a
+                href="/admin/audit"
+                class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
+              >
+                Clear
+              </a>
+            )}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+
+    {/* Audit Logs Table */}
+    <Card>
+      <CardHeader>
+        <CardTitle>Activity Log</CardTitle>
+        <CardDescription>
+          Showing {logs?.length || 0} of {count || 0} total entries
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b">
+                <th class="text-left p-4">Timestamp</th>
+                <th class="text-left p-4">User</th>
+                <th class="text-left p-4">Action</th>
+                <th class="text-left p-4">Resource</th>
+                <th class="text-left p-4">Details</th>
+                <th class="text-left p-4">IP Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs?.map((log) => (
+                <tr class="border-b hover:bg-muted/50">
+                  <td class="p-4">
+                    <div class="text-sm">
+                      {new Date(log.created_at).toLocaleString()}
+                    </div>
+                    <div class="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                    </div>
+                  </td>
+                  <td class="p-4">
+                    {log.profiles ? (
+                      <div>
+                        <div class="text-sm font-medium">{log.profiles.full_name || 'Unknown'}</div>
+                        <div class="text-xs text-muted-foreground">{log.profiles.email}</div>
+                      </div>
+                    ) : (
+                      <span class="text-sm text-muted-foreground">System</span>
+                    )}
+                  </td>
+                  <td class="p-4">
+                    <Badge className={getActionColor(log.action)} variant="secondary">
+                      {log.action}
+                    </Badge>
+                  </td>
+                  <td class="p-4">
+                    <div class="text-sm">
+                      <span class="font-medium">{log.resource_type}</span>
+                      {log.resource_id && (
+                        <div class="text-xs text-muted-foreground">
+                          {log.resource_id}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td class="p-4">
+                    <details class="cursor-pointer">
+                      <summary class="text-sm">
+                        {log.details ? 'View Details' : '-'}
+                      </summary>
+                      {log.details && (
+                        <pre class="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto max-w-md">
+                          {formatDetails(log.details)}
+                        </pre>
+                      )}
+                    </details>
+                  </td>
+                  <td class="p-4">
+                    <div class="text-xs font-mono">
+                      {log.ip_address || '-'}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {(!logs || logs.length === 0) && (
+            <div class="text-center py-8 text-muted-foreground">
+              No audit logs found
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div class="flex items-center justify-between mt-6">
+            <div class="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </div>
+            <div class="flex gap-2">
+              {hasPrev && (
+                <a
+                  href={`?page=${page - 1}${actionFilter ? `&action=${actionFilter}` : ''}${resourceFilter ? `&resource=${resourceFilter}` : ''}${userFilter ? `&user=${userFilter}` : ''}`}
+                  class="px-3 py-1 border rounded hover:bg-muted"
+                >
+                  Previous
+                </a>
+              )}
+              {hasNext && (
+                <a
+                  href={`?page=${page + 1}${actionFilter ? `&action=${actionFilter}` : ''}${resourceFilter ? `&resource=${resourceFilter}` : ''}${userFilter ? `&user=${userFilter}` : ''}`}
+                  class="px-3 py-1 border rounded hover:bg-muted"
+                >
+                  Next
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  </div>
+</AdminLayout>

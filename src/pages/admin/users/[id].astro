@@ -1,0 +1,268 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { 
+  ArrowLeft, 
+  Mail, 
+  Shield, 
+  Calendar, 
+  CreditCard,
+  Activity,
+  Ban,
+  UserCheck,
+  Edit
+} from 'lucide-react';
+import { UserRole } from '@/lib/permissions';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/admin/users');
+}
+
+const supabase = createServerSupabaseClient(Astro.cookies);
+
+// Get user details
+const { data: user, error } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('id', id)
+  .single();
+
+if (error || !user) {
+  return Astro.redirect('/admin/users');
+}
+
+// Get user's subscription
+const { data: subscription } = await supabase
+  .from('subscriptions')
+  .select('*')
+  .eq('user_id', id)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+
+// Get user's recent activity (mock for now)
+const recentActivity = [
+  { action: 'Logged in', timestamp: new Date().toISOString(), ip: '192.168.1.1' },
+  { action: 'Updated profile', timestamp: new Date(Date.now() - 86400000).toISOString(), ip: '192.168.1.1' },
+  { action: 'Changed password', timestamp: new Date(Date.now() - 172800000).toISOString(), ip: '192.168.1.2' },
+];
+---
+
+<AdminLayout title="User Details">
+  <!-- Back Button -->
+  <div className="mb-6">
+    <Button variant="ghost" size="sm" asChild>
+      <a href="/admin/users">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Users
+      </a>
+    </Button>
+  </div>
+
+  <div className="grid gap-6 lg:grid-cols-3">
+    <!-- User Info -->
+    <div className="lg:col-span-2 space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{user.full_name || 'Unnamed User'}</CardTitle>
+              <CardDescription className="flex items-center gap-1 mt-1">
+                <Mail className="h-3 w-3" />
+                {user.email}
+              </CardDescription>
+            </div>
+            <Badge 
+              variant={
+                user.role === UserRole.SUPER_ADMIN ? 'destructive' :
+                user.role === UserRole.ADMIN ? 'default' :
+                'secondary'
+              }
+            >
+              <Shield className="mr-1 h-3 w-3" />
+              {user.role || UserRole.USER}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm font-medium text-muted-foreground">User ID</dt>
+              <dd className="mt-1 text-sm font-mono">{user.id}</dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-muted-foreground">Joined</dt>
+              <dd className="mt-1 text-sm flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                {new Date(user.created_at).toLocaleDateString()}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-muted-foreground">Last Updated</dt>
+              <dd className="mt-1 text-sm">
+                {new Date(user.updated_at).toLocaleDateString()}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-muted-foreground">Avatar URL</dt>
+              <dd className="mt-1 text-sm text-muted-foreground">
+                {user.avatar_url || 'Not set'}
+              </dd>
+            </div>
+          </dl>
+          
+          <Separator className="my-6" />
+          
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              <Edit className="mr-2 h-4 w-4" />
+              Edit User
+            </Button>
+            <Button variant="outline" size="sm">
+              <Mail className="mr-2 h-4 w-4" />
+              Send Email
+            </Button>
+            {user.role !== UserRole.SUPER_ADMIN && (
+              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <Ban className="mr-2 h-4 w-4" />
+                Suspend User
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Subscription Info -->
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Subscription
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {subscription ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium capitalize">{subscription.plan} Plan</p>
+                  <p className="text-sm text-muted-foreground">
+                    ${subscription.plan === 'starter' ? '9' : subscription.plan === 'pro' ? '29' : '99'}/month
+                  </p>
+                </div>
+                <Badge 
+                  variant={
+                    subscription.status === 'active' ? 'default' :
+                    subscription.status === 'past_due' ? 'destructive' :
+                    'secondary'
+                  }
+                >
+                  {subscription.status}
+                </Badge>
+              </div>
+              
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Started</dt>
+                  <dd>{new Date(subscription.created_at).toLocaleDateString()}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Current Period Ends</dt>
+                  <dd>{new Date(subscription.current_period_end).toLocaleDateString()}</dd>
+                </div>
+                {subscription.cancel_at_period_end && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Cancels At</dt>
+                    <dd className="text-destructive">
+                      {new Date(subscription.current_period_end).toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              
+              <Separator />
+              
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm">
+                  View in Stripe
+                </Button>
+                {!subscription.cancel_at_period_end && (
+                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                    Cancel Subscription
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No active subscription</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Activity Log -->
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {recentActivity.map((activity, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <div className="mt-1">
+                  <UserCheck className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm font-medium">{activity.action}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(activity.timestamp).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    IP: {activity.ip}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Quick Stats -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Stats</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="space-y-3">
+            <div className="flex justify-between">
+              <dt className="text-sm text-muted-foreground">Total Logins</dt>
+              <dd className="text-sm font-medium">142</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-sm text-muted-foreground">Projects Created</dt>
+              <dd className="text-sm font-medium">8</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-sm text-muted-foreground">API Calls (30d)</dt>
+              <dd className="text-sm font-medium">1,247</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-sm text-muted-foreground">Storage Used</dt>
+              <dd className="text-sm font-medium">124 MB</dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+</AdminLayout>

@@ -269,6 +269,172 @@ X-RateLimit-Reset: 1640995200</code>
           </div>
         </CardContent>
       </Card>
+
+      <!-- Admin Endpoints -->
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Admin</CardTitle>
+          <CardDescription>Administrative endpoints (requires admin role)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <!-- Users Management -->
+          <div className="border-b pb-4">
+            <h4 className="font-semibold mb-4">User Management</h4>
+            
+            <!-- GET Users -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">GET</Badge>
+                <code className="text-sm">/api/v1/admin/users</code>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                List all users with filtering and pagination
+              </p>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium">Query Parameters</summary>
+                <ul className="list-disc pl-6 mt-2 text-sm space-y-1">
+                  <li><code>page</code> - Page number (default: 1)</li>
+                  <li><code>limit</code> - Items per page (default: 20, max: 100)</li>
+                  <li><code>search</code> - Search by email or name</li>
+                  <li><code>role</code> - Filter by role (user/admin/super_admin)</li>
+                  <li><code>sortBy</code> - Sort field (created_at/email/full_name/role)</li>
+                  <li><code>sortOrder</code> - Sort order (asc/desc)</li>
+                </ul>
+              </details>
+            </div>
+            
+            <!-- POST User -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">POST</Badge>
+                <code className="text-sm">/api/v1/admin/users</code>
+                <Badge variant="outline" className="text-xs">Super Admin</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Create a new user (requires super admin)
+              </p>
+            </div>
+            
+            <!-- GET User -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">GET</Badge>
+                <code className="text-sm">/api/v1/admin/users/:id</code>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Get detailed user information
+              </p>
+            </div>
+            
+            <!-- PATCH User -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">PATCH</Badge>
+                <code className="text-sm">/api/v1/admin/users/:id</code>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Update user details and permissions
+              </p>
+            </div>
+            
+            <!-- DELETE User -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="destructive">DELETE</Badge>
+                <code className="text-sm">/api/v1/admin/users/:id</code>
+                <Badge variant="outline" className="text-xs">Super Admin</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Delete a user (requires super admin)
+              </p>
+            </div>
+          </div>
+          
+          <!-- Subscription Management -->
+          <div className="border-b pb-4">
+            <h4 className="font-semibold mb-4">Subscription Management</h4>
+            
+            <!-- GET Subscriptions -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">GET</Badge>
+                <code className="text-sm">/api/v1/admin/subscriptions</code>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                List all subscriptions with filtering
+              </p>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium">Query Parameters</summary>
+                <ul className="list-disc pl-6 mt-2 text-sm space-y-1">
+                  <li><code>page</code> - Page number</li>
+                  <li><code>limit</code> - Items per page</li>
+                  <li><code>status</code> - Filter by status (active/canceled/past_due/trialing)</li>
+                  <li><code>plan</code> - Filter by plan (starter/pro/enterprise)</li>
+                </ul>
+              </details>
+            </div>
+            
+            <!-- POST Subscription Action -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">POST</Badge>
+                <code className="text-sm">/api/v1/admin/subscriptions</code>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Perform subscription actions (cancel, reactivate, refund)
+              </p>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium">Request Body</summary>
+                <pre className="bg-muted p-3 rounded-md mt-2 text-xs">
+                  <code>{`{
+  "action": "cancel" | "reactivate" | "refund",
+  "subscription_id": "sub_123",
+  "reason": "Customer request"
+}`}</code>
+                </pre>
+              </details>
+            </div>
+          </div>
+          
+          <!-- Analytics & Stats -->
+          <div className="border-b pb-4">
+            <h4 className="font-semibold mb-4">Analytics & Statistics</h4>
+            
+            <!-- GET Stats -->
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">GET</Badge>
+                <code className="text-sm">/api/v1/admin/stats</code>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Get comprehensive statistics and analytics
+              </p>
+              <details>
+                <summary className="cursor-pointer text-sm font-medium">Query Parameters</summary>
+                <ul className="list-disc pl-6 mt-2 text-sm space-y-1">
+                  <li><code>period</code> - Time period (7d/30d/90d/1y)</li>
+                </ul>
+              </details>
+            </div>
+          </div>
+          
+          <!-- System Health -->
+          <div>
+            <h4 className="font-semibold mb-4">System Health</h4>
+            
+            <!-- GET Health -->
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary">GET</Badge>
+                <code className="text-sm">/api/v1/admin/health</code>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Get system health status and metrics
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </section>
 
     <!-- Pagination -->
