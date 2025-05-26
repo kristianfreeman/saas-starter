@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   // Supabase
-  SUPABASE_URL: z.string().url().optional(),
-  SUPABASE_ANON_KEY: z.string().min(1).optional(),
+  PUBLIC_SUPABASE_URL: z.string().url().optional(),
+  PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
   SUPABASE_SERVICE_KEY: z.string().min(1).optional(),
   
   // Better Auth
@@ -52,7 +52,7 @@ export const getEnv = <K extends keyof Env>(key: K): Env[K] => {
 
 // Check if all required services are configured
 export const isSupabaseConfigured = (): boolean => {
-  return !!(env.SUPABASE_URL && env.SUPABASE_ANON_KEY);
+  return !!(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
 };
 
 export const isAuthConfigured = (): boolean => {
