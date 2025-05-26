@@ -1,0 +1,252 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import NavigationWrapper from '@/components/navigation-wrapper.astro';
+import { Footer } from '@/components/footer';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { getUser } from '@/lib/supabase/server';
+import { getSubscription } from '@/lib/supabase/utils';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getPlanById, formatPrice } from '@/lib/stripe/plans';
+import { AlertCircle, CreditCard, Calendar, Package } from 'lucide-react';
+
+const user = await getUser(Astro.cookies);
+const supabase = createServerSupabaseClient(Astro.cookies);
+
+let subscription = null;
+let currentPlan = null;
+
+if (user) {
+  subscription = await getSubscription(supabase, user.id);
+  if (subscription?.plan) {
+    currentPlan = getPlanById(subscription.plan);
+  }
+}
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+---
+
+<BaseLayout title="Billing - SaaS Starter">
+  <NavigationWrapper />
+  
+  <div className="container max-w-4xl py-8">
+    <div className="mb-8">
+      <h1 className="text-3xl font-bold">Billing & Subscription</h1>
+      <p className="text-muted-foreground">Manage your subscription and billing information</p>
+    </div>
+
+    <div className="grid gap-6">
+      <!-- Current Plan -->
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Current Plan
+          </CardTitle>
+          <CardDescription>Your active subscription details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {subscription && currentPlan ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-semibold">{currentPlan.name}</h3>
+                  <p className="text-muted-foreground">{currentPlan.description}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold">{formatPrice(currentPlan.price)}</p>
+                  <p className="text-sm text-muted-foreground">per {currentPlan.interval}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">
+                    {subscription.cancel_at_period_end ? 'Cancels' : 'Renews'} on
+                  </span>
+                  <span className="font-medium">
+                    {formatDate(subscription.current_period_end)}
+                  </span>
+                </div>
+                <div>
+                  <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                    subscription.status === 'active' 
+                      ? 'bg-green-100 text-green-700'
+                      : subscription.status === 'past_due'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {subscription.status}
+                  </span>
+                </div>
+              </div>
+
+              {subscription.cancel_at_period_end && (
+                <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-yellow-900">Subscription ending</p>
+                    <p className="text-yellow-700">
+                      Your subscription will end on {formatDate(subscription.current_period_end)}.
+                      You can resume your subscription anytime before this date.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">You don't have an active subscription</p>
+              <Button asChild>
+                <a href="/pricing">View Plans</a>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <!-- Billing Actions -->
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Billing Management
+          </CardTitle>
+          <CardDescription>Update payment methods and billing information</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button 
+            variant="outline" 
+            className="w-full sm:w-auto"
+            id="manage-billing"
+          >
+            Manage Billing
+          </Button>
+          
+          {subscription && !subscription.cancel_at_period_end && (
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto text-destructive hover:text-destructive"
+              id="cancel-subscription"
+            >
+              Cancel Subscription
+            </Button>
+          )}
+          
+          {subscription?.cancel_at_period_end && (
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto"
+              id="resume-subscription"
+            >
+              Resume Subscription
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <!-- Plan Features -->
+      {currentPlan && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Plan Features</CardTitle>
+            <CardDescription>What's included in your {currentPlan.name} plan</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {currentPlan.features.map((feature) => (
+                <li className="flex items-center gap-2">
+                  <div className="h-2 w-2 bg-primary rounded-full" />
+                  <span className="text-sm">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 pt-6 border-t">
+              <p className="text-sm text-muted-foreground mb-3">
+                Need more features? Upgrade your plan for additional capabilities.
+              </p>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/pricing">View All Plans</a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  </div>
+
+  <Footer />
+</BaseLayout>
+
+<script>
+  // Handle manage billing
+  document.getElementById('manage-billing')?.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Failed to open billing portal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error opening billing portal:', error);
+      alert('An error occurred. Please try again.');
+    }
+  });
+
+  // Handle cancel subscription
+  document.getElementById('cancel-subscription')?.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to cancel your subscription? You will continue to have access until the end of your billing period.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Failed to open billing portal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      alert('An error occurred. Please try again.');
+    }
+  });
+
+  // Handle resume subscription
+  document.getElementById('resume-subscription')?.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Failed to open billing portal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error resuming subscription:', error);
+      alert('An error occurred. Please try again.');
+    }
+  });
+</script>

@@ -5,6 +5,7 @@ import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check } from 'lucide-react';
+import { subscriptionPlans, formatPrice } from '@/lib/stripe/plans';
 
 const features = [
   {
@@ -33,27 +34,6 @@ const features = [
   },
 ];
 
-const pricingPlans = [
-  {
-    name: 'Starter',
-    price: '$9',
-    description: 'Perfect for side projects',
-    features: ['Up to 1,000 users', 'Basic analytics', 'Email support'],
-  },
-  {
-    name: 'Pro',
-    price: '$29',
-    description: 'For growing businesses',
-    features: ['Unlimited users', 'Advanced analytics', 'Priority support', 'Custom integrations'],
-    popular: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    description: 'For large organizations',
-    features: ['Dedicated support', 'SLA guarantee', 'Custom features', 'On-premise option'],
-  },
-];
 ---
 
 <BaseLayout title="SaaS Starter - Modern SaaS Template">
@@ -122,7 +102,7 @@ const pricingPlans = [
           </p>
         </div>
         <div className="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-3">
-          {pricingPlans.map((plan) => (
+          {subscriptionPlans.map((plan) => (
             <Card className={plan.popular ? 'border-primary' : ''}>
               <CardHeader>
                 <CardTitle>{plan.name}</CardTitle>
@@ -130,8 +110,8 @@ const pricingPlans = [
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  {plan.price !== 'Custom' && <span className="text-muted-foreground">/month</span>}
+                  <span className="text-4xl font-bold">{formatPrice(plan.price)}</span>
+                  <span className="text-muted-foreground">/{plan.interval}</span>
                 </div>
                 <ul className="space-y-2">
                   {plan.features.map((feature) => (
@@ -141,8 +121,12 @@ const pricingPlans = [
                     </li>
                   ))}
                 </ul>
-                <Button className="w-full" variant={plan.popular ? 'default' : 'outline'}>
-                  Get Started
+                <Button 
+                  className="w-full" 
+                  variant={plan.popular ? 'default' : 'outline'}
+                  asChild
+                >
+                  <a href="/auth/register">Get Started</a>
                 </Button>
               </CardContent>
             </Card>

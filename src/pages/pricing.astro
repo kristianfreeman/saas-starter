@@ -1,0 +1,151 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import NavigationWrapper from '@/components/navigation-wrapper.astro';
+import { Footer } from '@/components/footer';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Check } from 'lucide-react';
+import { subscriptionPlans, formatPrice } from '@/lib/stripe/plans';
+import { getSession } from '@/lib/supabase/server';
+
+const session = await getSession(Astro.cookies);
+const isAuthenticated = !!session;
+---
+
+<BaseLayout title="Pricing - SaaS Starter">
+  <NavigationWrapper />
+  
+  <main>
+    <!-- Pricing Section -->
+    <section className="py-20 sm:py-32">
+      <div className="container">
+        <div className="mx-auto max-w-2xl text-center">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            Simple, transparent pricing
+          </h1>
+          <p className="mt-4 text-lg text-muted-foreground">
+            Choose the plan that fits your needs. Always flexible to scale.
+          </p>
+        </div>
+        <div className="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-3">
+          {subscriptionPlans.map((plan) => (
+            <Card className={plan.popular ? 'border-primary shadow-lg' : ''}>
+              <CardHeader>
+                {plan.popular && (
+                  <div className="mb-4">
+                    <span className="inline-flex items-center rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                      Most Popular
+                    </span>
+                  </div>
+                )}
+                <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                <CardDescription>{plan.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <span className="text-5xl font-bold">{formatPrice(plan.price)}</span>
+                  <span className="text-muted-foreground">/{plan.interval}</span>
+                </div>
+                <ul className="space-y-3">
+                  {plan.features.map((feature) => (
+                    <li className="flex items-center gap-3">
+                      <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button 
+                  className="w-full" 
+                  variant={plan.popular ? 'default' : 'outline'}
+                  size="lg"
+                  data-plan-id={plan.id}
+                  data-authenticated={isAuthenticated}
+                >
+                  {isAuthenticated ? 'Select Plan' : 'Get Started'}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section className="py-20 border-t">
+      <div className="container">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight">
+            Frequently asked questions
+          </h2>
+          <div className="mt-12 space-y-8 text-left">
+            <div>
+              <h3 className="font-semibold">Can I change plans later?</h3>
+              <p className="mt-2 text-muted-foreground">
+                Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold">What payment methods do you accept?</h3>
+              <p className="mt-2 text-muted-foreground">
+                We accept all major credit cards and debit cards through our secure payment processor, Stripe.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold">Is there a free trial?</h3>
+              <p className="mt-2 text-muted-foreground">
+                We offer a 14-day free trial on all plans. No credit card required to start.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold">Can I cancel anytime?</h3>
+              <p className="mt-2 text-muted-foreground">
+                Yes, you can cancel your subscription at any time. You'll continue to have access until the end of your billing period.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<script>
+  // Handle plan selection
+  document.querySelectorAll('[data-plan-id]').forEach(button => {
+    button.addEventListener('click', async (e) => {
+      const planId = (e.target as HTMLElement).dataset.planId;
+      const isAuthenticated = (e.target as HTMLElement).dataset.authenticated === 'true';
+      
+      if (!isAuthenticated) {
+        // Redirect to register page
+        window.location.href = '/auth/register';
+        return;
+      }
+
+      // Create checkout session
+      try {
+        const response = await fetch('/api/stripe/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ planId }),
+        });
+
+        const data = await response.json();
+        
+        if (data.url) {
+          // Redirect to Stripe Checkout
+          window.location.href = data.url;
+        } else {
+          alert('Failed to create checkout session. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error creating checkout session:', error);
+        alert('An error occurred. Please try again.');
+      }
+    });
+  });
+</script>
