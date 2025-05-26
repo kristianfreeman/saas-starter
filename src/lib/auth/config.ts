@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/types';
+import { sendWelcomeEmail } from '@/lib/email';
 
 // For now, we'll use Supabase Auth directly
 // Better Auth integration can be added later as it requires more complex setup
@@ -27,6 +28,19 @@ export async function signUp(email: string, password: string, fullName?: string)
 
   if (error) {
     return { data: null, error: { message: error.message } };
+  }
+
+  // Send welcome email if signup was successful
+  if (data.user && fullName) {
+    try {
+      await sendWelcomeEmail({
+        to: email,
+        name: fullName,
+      });
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail the signup if email fails
+    }
   }
 
   return { data, error: null };

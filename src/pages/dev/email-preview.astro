@@ -1,0 +1,161 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+
+// Only allow in development
+if (import.meta.env.PROD) {
+  return Astro.redirect('/404');
+}
+---
+
+<BaseLayout title="Email Preview">
+  <div class="container py-8">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold">Email Templates Preview</h1>
+      <p class="text-muted-foreground">Preview all email templates in development</p>
+    </div>
+
+    <div class="grid gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Welcome Email</CardTitle>
+          <CardDescription>Sent when a new user signs up</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-4">
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" data-preview="welcome">
+                Preview
+              </Button>
+              <Button variant="outline" size="sm" data-send="welcome">
+                Send Test
+              </Button>
+            </div>
+            <div id="welcome-preview" class="hidden border rounded-lg overflow-hidden"></div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Password Reset Email</CardTitle>
+          <CardDescription>Sent when a user requests a password reset</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-4">
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" data-preview="password-reset">
+                Preview
+              </Button>
+              <Button variant="outline" size="sm" data-send="password-reset">
+                Send Test
+              </Button>
+            </div>
+            <div id="password-reset-preview" class="hidden border rounded-lg overflow-hidden"></div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Verification Email</CardTitle>
+          <CardDescription>Sent to verify a user's email address</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-4">
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" data-preview="verification">
+                Preview
+              </Button>
+              <Button variant="outline" size="sm" data-send="verification">
+                Send Test
+              </Button>
+            </div>
+            <div id="verification-preview" class="hidden border rounded-lg overflow-hidden"></div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { render } from '@react-email/components';
+  import WelcomeEmail from '@/lib/email/templates/welcome';
+  import PasswordResetEmail from '@/lib/email/templates/password-reset';
+  import VerificationEmail from '@/lib/email/templates/verification';
+
+  // Preview handlers
+  document.querySelectorAll('[data-preview]').forEach(button => {
+    button.addEventListener('click', async (e) => {
+      const template = (e.target as HTMLElement).dataset.preview;
+      const previewContainer = document.getElementById(`${template}-preview`);
+      
+      if (!previewContainer) return;
+
+      let html = '';
+      
+      switch (template) {
+        case 'welcome':
+          html = render(WelcomeEmail({
+            name: 'John Doe',
+            email: 'john@example.com',
+            loginUrl: `${window.location.origin}/auth/login`,
+          }));
+          break;
+        case 'password-reset':
+          html = render(PasswordResetEmail({
+            name: 'John Doe',
+            resetUrl: `${window.location.origin}/auth/reset-password?token=example-token`,
+            expiresIn: '1 hour',
+          }));
+          break;
+        case 'verification':
+          html = render(VerificationEmail({
+            name: 'John Doe',
+            verificationUrl: `${window.location.origin}/auth/verify-email?token=example-token`,
+            expiresIn: '24 hours',
+          }));
+          break;
+      }
+
+      previewContainer.innerHTML = html;
+      previewContainer.classList.remove('hidden');
+    });
+  });
+
+  // Send test email handlers
+  document.querySelectorAll('[data-send]').forEach(button => {
+    button.addEventListener('click', async (e) => {
+      const template = (e.target as HTMLElement).dataset.send;
+      const testEmail = prompt('Enter test email address:');
+      
+      if (!testEmail) return;
+
+      try {
+        const response = await fetch('/api/email/send-test', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            template,
+            to: testEmail,
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('Test email sent successfully!');
+        } else {
+          alert(`Failed to send test email: ${result.error}`);
+        }
+      } catch (error) {
+        alert('Failed to send test email');
+        console.error(error);
+      }
+    });
+  });
+</script>
