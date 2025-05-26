@@ -1,0 +1,304 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import NavigationWrapper from '@/components/navigation-wrapper.astro';
+import { Footer } from '@/components/footer';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+---
+
+<BaseLayout title="API Documentation - SaaS Starter">
+  <NavigationWrapper />
+  
+  <div className="container max-w-6xl py-8">
+    <div className="mb-8">
+      <h1 className="text-4xl font-bold">API Documentation</h1>
+      <p className="text-muted-foreground mt-2">
+        Complete reference for the SaaS Starter API v1
+      </p>
+    </div>
+
+    <!-- Introduction -->
+    <section className="mb-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Introduction</CardTitle>
+        </CardHeader>
+        <CardContent className="prose prose-sm max-w-none">
+          <p>
+            The SaaS Starter API provides programmatic access to your application's resources. 
+            All API endpoints are RESTful and return JSON responses.
+          </p>
+          
+          <h3 className="text-lg font-semibold mt-4">Base URL</h3>
+          <pre className="bg-muted p-3 rounded-md">
+            <code>{Astro.url.origin}/api/v1</code>
+          </pre>
+          
+          <h3 className="text-lg font-semibold mt-4">Content Type</h3>
+          <p>All requests must include the following header:</p>
+          <pre className="bg-muted p-3 rounded-md">
+            <code>Content-Type: application/json</code>
+          </pre>
+        </CardContent>
+      </Card>
+    </section>
+
+    <!-- Authentication -->
+    <section className="mb-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Authentication</CardTitle>
+        </CardHeader>
+        <CardContent className="prose prose-sm max-w-none">
+          <p>The API supports two authentication methods:</p>
+          
+          <h3 className="text-lg font-semibold mt-4">1. Session Authentication</h3>
+          <p>
+            If you're making requests from the same domain, session cookies will be automatically included.
+          </p>
+          
+          <h3 className="text-lg font-semibold mt-4">2. Bearer Token</h3>
+          <p>For external applications, include your access token in the Authorization header:</p>
+          <pre className="bg-muted p-3 rounded-md">
+            <code>Authorization: Bearer YOUR_ACCESS_TOKEN</code>
+          </pre>
+        </CardContent>
+      </Card>
+    </section>
+
+    <!-- Rate Limiting -->
+    <section className="mb-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Rate Limiting</CardTitle>
+        </CardHeader>
+        <CardContent className="prose prose-sm max-w-none">
+          <p>API requests are rate limited to prevent abuse. The following limits apply:</p>
+          
+          <ul className="list-disc pl-6 mt-4 space-y-2">
+            <li><strong>General API:</strong> 100 requests per 15 minutes</li>
+            <li><strong>Authentication:</strong> 5 requests per 15 minutes</li>
+            <li><strong>Read operations:</strong> 60 requests per minute</li>
+            <li><strong>Write operations:</strong> 10 requests per minute</li>
+          </ul>
+          
+          <h3 className="text-lg font-semibold mt-4">Rate Limit Headers</h3>
+          <p>Each response includes headers indicating your current rate limit status:</p>
+          <pre className="bg-muted p-3 rounded-md">
+            <code>X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 99
+X-RateLimit-Reset: 1640995200</code>
+          </pre>
+        </CardContent>
+      </Card>
+    </section>
+
+    <!-- Error Responses -->
+    <section className="mb-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Error Responses</CardTitle>
+        </CardHeader>
+        <CardContent className="prose prose-sm max-w-none">
+          <p>Error responses follow a consistent format:</p>
+          <pre className="bg-muted p-3 rounded-md">
+            <code>{`{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request body",
+    "details": {
+      "field": ["error message"]
+    }
+  }
+}`}</code>
+          </pre>
+          
+          <h3 className="text-lg font-semibold mt-4">Common Error Codes</h3>
+          <ul className="list-disc pl-6 mt-4 space-y-2">
+            <li><code>UNAUTHORIZED</code> - Authentication required</li>
+            <li><code>INVALID_TOKEN</code> - Invalid or expired token</li>
+            <li><code>VALIDATION_ERROR</code> - Request validation failed</li>
+            <li><code>NOT_FOUND</code> - Resource not found</li>
+            <li><code>RATE_LIMIT_EXCEEDED</code> - Too many requests</li>
+            <li><code>INTERNAL_ERROR</code> - Server error</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </section>
+
+    <!-- API Endpoints -->
+    <section className="mb-12">
+      <h2 className="text-2xl font-bold mb-6">API Endpoints</h2>
+      
+      <!-- Profile Endpoints -->
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Profile</CardTitle>
+          <CardDescription>Manage user profile information</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <!-- GET Profile -->
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="secondary">GET</Badge>
+              <code className="text-sm">/api/v1/profile</code>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Get the authenticated user's profile
+            </p>
+            <details>
+              <summary className="cursor-pointer text-sm font-medium">Response Example</summary>
+              <pre className="bg-muted p-3 rounded-md mt-2 text-xs">
+                <code>{`{
+  "data": {
+    "id": "user_123",
+    "email": "user@example.com",
+    "full_name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Software developer",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+}`}</code>
+              </pre>
+            </details>
+          </div>
+          
+          <!-- PUT Profile -->
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="secondary">PUT</Badge>
+              <code className="text-sm">/api/v1/profile</code>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Update the authenticated user's profile
+            </p>
+            <details>
+              <summary className="cursor-pointer text-sm font-medium">Request Body</summary>
+              <pre className="bg-muted p-3 rounded-md mt-2 text-xs">
+                <code>{`{
+  "full_name": "Jane Doe",
+  "avatar_url": "https://example.com/new-avatar.jpg",
+  "bio": "Full-stack developer"
+}`}</code>
+              </pre>
+            </details>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <!-- Projects Endpoints -->
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Projects</CardTitle>
+          <CardDescription>Manage user projects</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <!-- GET Projects -->
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="secondary">GET</Badge>
+              <code className="text-sm">/api/v1/projects</code>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              List all projects for the authenticated user
+            </p>
+            <details>
+              <summary className="cursor-pointer text-sm font-medium">Query Parameters</summary>
+              <ul className="list-disc pl-6 mt-2 text-sm space-y-1">
+                <li><code>page</code> - Page number (default: 1)</li>
+                <li><code>limit</code> - Items per page (default: 10, max: 100)</li>
+                <li><code>sort</code> - Sort field</li>
+                <li><code>order</code> - Sort order (asc/desc)</li>
+              </ul>
+            </details>
+          </div>
+          
+          <!-- POST Projects -->
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="secondary">POST</Badge>
+              <code className="text-sm">/api/v1/projects</code>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Create a new project
+            </p>
+            <details>
+              <summary className="cursor-pointer text-sm font-medium">Request Body</summary>
+              <pre className="bg-muted p-3 rounded-md mt-2 text-xs">
+                <code>{`{
+  "name": "My Project",
+  "description": "Project description",
+  "is_public": false
+}`}</code>
+              </pre>
+            </details>
+          </div>
+          
+          <!-- GET Project -->
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="secondary">GET</Badge>
+              <code className="text-sm">/api/v1/projects/:id</code>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Get a specific project by ID
+            </p>
+          </div>
+          
+          <!-- PUT Project -->
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="secondary">PUT</Badge>
+              <code className="text-sm">/api/v1/projects/:id</code>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Update a project
+            </p>
+          </div>
+          
+          <!-- DELETE Project -->
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="destructive">DELETE</Badge>
+              <code className="text-sm">/api/v1/projects/:id</code>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Delete a project
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+
+    <!-- Pagination -->
+    <section className="mb-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>Pagination</CardTitle>
+        </CardHeader>
+        <CardContent className="prose prose-sm max-w-none">
+          <p>List endpoints support pagination through query parameters:</p>
+          <pre className="bg-muted p-3 rounded-md mt-4">
+            <code>GET /api/v1/projects?page=2&limit=20</code>
+          </pre>
+          
+          <p className="mt-4">Paginated responses include metadata:</p>
+          <pre className="bg-muted p-3 rounded-md">
+            <code>{`{
+  "data": [...],
+  "meta": {
+    "page": 2,
+    "limit": 20,
+    "total": 150,
+    "hasMore": true
+  }
+}`}</code>
+          </pre>
+        </CardContent>
+      </Card>
+    </section>
+  </div>
+
+  <Footer />
+</BaseLayout>
