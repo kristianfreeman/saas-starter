@@ -6,12 +6,10 @@ describe('Environment validation', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should validate PUBLIC_APP_URL format', () => {
+  it('should validate PUBLIC_APP_URL format', async () => {
     vi.stubEnv('PUBLIC_APP_URL', 'not-a-url');
     
-    expect(() => {
-      import('./env');
-    }).rejects.toThrow();
+    await expect(import('./env')).rejects.toThrow();
   });
 
   it('should use default values when not provided', async () => {
@@ -19,15 +17,13 @@ describe('Environment validation', () => {
     
     expect(module.env.PUBLIC_APP_URL).toBe('http://localhost:4321');
     expect(module.env.PUBLIC_APP_NAME).toBe('SaaS Starter');
-    expect(module.env.NODE_ENV).toBe('development');
+    expect(module.env.NODE_ENV).toBe('test');
   });
 
-  it('should validate Stripe keys format', () => {
+  it('should validate Stripe keys format', async () => {
     vi.stubEnv('STRIPE_SECRET_KEY', 'invalid-key');
     
-    expect(() => {
-      import('./env');
-    }).rejects.toThrow();
+    await expect(import('./env')).rejects.toThrow();
   });
 
   it('should check service configuration', async () => {
