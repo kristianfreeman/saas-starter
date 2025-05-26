@@ -18,7 +18,8 @@
       "Bash(touch:*)",
       "Bash(chmod:*)",
       "Bash(npm run test:e2e:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }
